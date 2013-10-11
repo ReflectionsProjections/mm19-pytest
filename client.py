@@ -11,6 +11,9 @@ import socket
 
 from ship import Ship
 
+# TODO (competitors): This is arbitrary but should be large enough
+MAX_BUFFER = 65565
+
 class Client(object):
     """
     A class for managing the client's connection.
@@ -47,9 +50,12 @@ class Client(object):
         self.port = port
         self.name = name
         self.sock = None
+        self.token = ""
+        self.resources = 0
 
     def connect(self):
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
         logging.info("Connection target is %s:%d", self.host, self.port)
         self.sock.connect((self.host, self.port))
         logging.info("Connection established")
@@ -66,13 +72,75 @@ class Client(object):
         shiparray -- The initial positions for all ships
         """
 
+        # Step 1: Set up the initial data payload
         payload = {'playerName': self.name}
         # TODO (competitors): This is really ugly because the main ship is
         # special cased. I'm sorry. Feel free to fix.
         payload['mainShip'] = shiparray[0].getJSON()
         payload['ships'] = [ship.getJSON() for ship in shiparray[1:]]
+
+        # Step 2: Transmit the payload and receive the reply
+        logging.info("Transmitting start package to server...")
+        reply = self._send_payload(payload)
+
+        # Step 3: Process the reply
+        self._process_reply(reply, setup=True)
+
+    def attack_forever(self):
+        """
+        This method does nothing remotely reasonable.
+
+        If you want a picture of the future, imagine a boot stomping on a
+        nautical battleground--forever.
+        """
+        self.alive = True
+        while(self.alive):
+            # Step 1: Construct a turn payload
+            payload = {'playerToken': self.token}
+            # TODO (competitors): You might want to actually keep track of which
+            # ships are which
+            shipactions = [{'ID': shipid, 'actionID': "F",
+                'actionX': random.randint(0,99),
+                'actionY': random.randint(0,99),
+                'actionExtra': 0} for shipid in range(5)]
+            payload['shipActions'] = shipactions
+
+            # Step 2: Transmit turn payload and wait for the reply
+            logging.info("Sending turn...")
+            reply = self._send_payload(payload)
+
+            # Step 3: Process the reply
+            self._process_reply(reply)
+
+    def _send_payload(self, payload):
+        """
+        Send a payload to the server and return the deserialized reply.
+
+        payload -- Payload dictionary to send out.
+
+        Returns a dictionary with the reply data.
+        """
+        logging.debug("Payload: %s", json.dumps(payload))
         # Send this information to the server
-        self.sock.sendall(json.dumps(payload))
+        self.sock.sendall(json.dumps(payload) + '\n')
+        return json.loads(self.sock.recv(MAX_BUFFER))
+
+    def _process_reply(self, reply, setup=False):
+        """
+        Process a reply from the server.
+
+        This method could use a lot more intelligence. As is, it ignores almost
+        everything in the reply payload.
+
+        reply -- The reply dictionary to process
+        setup (default=False) -- Whether this is a new server connection
+        """
+        if reply['error']:
+            logging.warn("Problem with last transmit: %s", reply['error'])
+            return
+        if setup:
+            self.token = reply['playerToken']
+        self.resources = reply['resources']
 
 def main():
     establish_logger(logging.DEBUG)
@@ -82,6 +150,8 @@ def main():
     client = Client("localhost", 6969, "Whatever it's 2009")
     client.connect()
     client.prep_game(ships)
+    # TODO (competitors): make your game do something now!
+    client.attack_forever()
 
 
 def establish_logger(loglevel):
