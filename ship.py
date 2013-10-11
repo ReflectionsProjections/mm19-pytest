@@ -26,11 +26,12 @@ class Ship(object):
     def getJSON(self):
       """Return the JSON dictionary representation of the ship."""
       out = {'xCoord': self.x, 'yCoord': self.y, 'orientation': self.orient}
-      if ship_type is not "M":
+      if self.ship_type is not "M":
         out['type'] = self.ship_type
       return out
 
-    def random_ship(ship_type):
+    @classmethod
+    def random_ship(Ship, ship_type):
       """
       Static method for placing a ship randomly.
 
@@ -38,5 +39,5 @@ class Ship(object):
       """
       x = random.randint(0, 99)
       y = random.randint(0, 99)
-      orient = random.choice("H", "V")
+      orient = random.choice(["H", "V"])
       return Ship(ship_type, x, y, orient)

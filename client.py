@@ -7,8 +7,9 @@
 import json
 import logging
 import random
+import socket
 
-import Ship
+from ship import Ship
 
 class Client(object):
     """
@@ -19,18 +20,42 @@ class Client(object):
     isn't important.
     """
 
-    def __init__(self, address, name):
+    def require_connection(func):
+        """
+        This is a decorator to wrap a function to require a server connection.
+
+        func -- A Client class function with self as the first argument.
+        """
+        def wrapped(self, *args):
+            if self.sock == None:
+                logging.error("Connection not established")
+            else:
+                return func(self, *args)
+
+        return wrapped
+
+    def __init__(self, host, port, name):
         """
         Initialize a client for interacting with the game.
 
-        address -- The fully qualified server address
-            (e.g. "http://example.com:8000")
+        host -- The hostname of the server to connect
+                (e.g.  "example.com")
+        port -- The port to connect on (e.g. 6969)
         name -- Unique name of the client connecting
         """
-        self.address = address
+        self.host = host
+        self.port = port
         self.name = name
+        self.sock = None
 
-    def prep_game(shiparray):
+    def connect(self):
+        self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        logging.info("Connection target is %s:%d", self.host, self.port)
+        self.sock.connect((self.host, self.port))
+        logging.info("Connection established")
+
+    @require_connection
+    def prep_game(self, shiparray):
         """
         Handle all the pre-work for game setup.
 
@@ -41,20 +66,21 @@ class Client(object):
         shiparray -- The initial positions for all ships
         """
 
-        logging.info("Connection target is %s", self.address)
         payload = {'playerName': self.name}
         # TODO (competitors): This is really ugly because the main ship is
         # special cased. I'm sorry. Feel free to fix.
-        payload['mainShip'] = ships[0].getJSON()
-        payload['ships'] = [ship.getJSON() for ships in ships[1:]]
-        # TODO (dylan): Actually send something here
+        payload['mainShip'] = shiparray[0].getJSON()
+        payload['ships'] = [ship.getJSON() for ship in shiparray[1:]]
+        # Send this information to the server
+        self.sock.sendall(json.dumps(payload))
 
 def main():
     establish_logger(logging.DEBUG)
     ships = generate_ships()
 
     # TODO (competitors): Change the client name, update ship positions, etc.
-    client = Client("http://localhost:6969", "Whatever it's 2009")
+    client = Client("localhost", 6969, "Whatever it's 2009")
+    client.connect()
     client.prep_game(ships)
 
 
@@ -67,11 +93,11 @@ def generate_ships():
     """This generates ships non-strategically for testing purposes."""
     # Let's get some ships
     ships = []
-    ships.add(Ship("M", 5, 5, "H"))
-    ships.add(Ship.random_ship("D"))
-    ships.add(Ship.random_ship("D"))
-    ships.add(Ship.random_ship("P"))
-    ships.add(Ship.random_ship("P"))
+    ships.append(Ship("M", 5, 5, "H"))
+    ships.append(Ship.random_ship("D"))
+    ships.append(Ship.random_ship("D"))
+    ships.append(Ship.random_ship("P"))
+    ships.append(Ship.random_ship("P"))
     return ships
 
 if __name__ == "__main__":
