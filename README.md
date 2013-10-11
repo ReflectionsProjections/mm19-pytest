@@ -7,7 +7,6 @@ Developed in Python 2.7.3
 
 ###Installation
 
-0. Have python and pip installed
+0. Have python
 1. (optional) Set up a virtualenv if desired
-2. Run `pip install -r requirements.txt`
-3. Run `python client.py` (or `./client.py` if your OS supports it)
+2. Run `python client.py` (or `./client.py` if your OS supports it)
